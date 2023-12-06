@@ -21,6 +21,7 @@ type ConfigContainer struct {
 	DefaultConnector string                       `json:"defaultconnector"`
 	Connectors       map[string]map[string]string `json:"connectors"`
 	QosMap           map[string]uint64            `json:"qosmap"`
+	Hints            map[string]uint64            `json:"hints"`
 	//QosMap           map[uint64]string            `json:"qosmap"`
 }
 
@@ -28,7 +29,7 @@ func NewConfigContainer() *ConfigContainer {
 	return new(ConfigContainer)
 }
 
-// Read & unmarshall configuration from 'name' file into configContainer structure
+// GetConfig reads & unmarshalls configuration from 'name' file into configContainer structure
 func (cc *ConfigContainer) GetConfig(name string) error {
 	f, err := os.ReadFile(name)
 	if err != nil {
