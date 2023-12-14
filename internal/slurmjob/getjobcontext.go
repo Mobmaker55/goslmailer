@@ -84,7 +84,7 @@ func (j *JobContext) GenerateHints(qosMap qosMapQL, hints map[string]uint64) {
 			j.Hints = append(j.Hints, "TIP: Please consider lowering the amount of requested memory in the future, your job has consumed less than half of the requested memory.")
 		}
 	}
-	// check CPU time (16 cores requested only 1 used) if over 1 CPU is requested (so people don't get docked for a job requesting the minimum 1 CPU)
+	// check CPU usage if over "min_cpu" is requested (so people don't get docked for a job requesting a minimal amount of CPU)
 	if j.JobStats.Ncpus > int64(hints["min_cpu"]) && j.JobStats.CPUTime/2 > j.JobStats.TotalCPU {
 		j.Hints = append(j.Hints, "TIP: Please consider lowering the amount of requested CPU cores in the future, your job has consumed less than half of the requested CPU cores")
 	}
@@ -112,7 +112,7 @@ func (j *JobContext) GenerateHints(qosMap qosMapQL, hints map[string]uint64) {
 				j.Hints = append(j.Hints, fmt.Sprintf("TIP: No --time specified: Using default %s QOS limit. Specify --time to increase the chances that the scheduler will use this job for backfilling purposes", qos))
 			}
 		} else {
-			if hints["change_qos"] > 0 || hints["no_time"] > 0 {
+			if hints["change_qos"] > 0 && hints["no_time"] > 0 {
 				j.Hints = append(j.Hints, fmt.Sprintf("TIP: Your job was submitted with a walltime of %s and finished in less half of the time, consider reducing the walltime and submit it to %s QOS", j.JobStats.WalltimeStr, optimalQos))
 			}
 		}
