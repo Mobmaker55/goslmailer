@@ -69,4 +69,10 @@
     "MEDIUM": 172800,
     "LONG": 1209600
   }
+  "hints": {
+    "min_ram": 2000000000,  # below this much RAM (in bytes), a "request less RAM" hint will not be generated
+    "min_cpu": 1,           # below this many CPUs, a "request less CPUs" hint will not be generated
+    "change_qos": 1,        # Toggle whether to generate a "change QoS" hint (1 for true, 0 for false)
+    "no_time": 1            # Toggle whether to generate a "request less time" hint (1 for true, 0 for false)
+  }
 }

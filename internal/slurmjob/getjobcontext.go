@@ -60,56 +60,68 @@ func calculateOptimalQOS(qosMap qosMapQL, runtime uint64) string {
 	//return keys[len(keys)-1].qos
 }
 
-// Populate JobContext.Hints with hints about the job (mis)usage and suggestions how to optimize it.
+// GenerateHints populates JobContext.Hints with hints about the job (mis)usage and suggestions how to optimize it.
+//
 //	todo: add more logic once more stats are in
-func (j *JobContext) GenerateHints(qosMap qosMapQL) {
-	if j.IsJobFinished() {
-		// Check OUT_OF_MEMORY
-		if j.SlurmEnvironment.SLURM_JOB_STATE == "OUT_OF_MEMORY" {
-			j.Hints = append(j.Hints, "TIP: The job ran out of memory. Please re-submit with increased memory requirements")
-			return
-		}
+func (j *JobContext) GenerateHints(qosMap qosMapQL, hints map[string]uint64) {
+	if !j.IsJobFinished() {
+		return
+	}
+	// Check OUT_OF_MEMORY
+	if j.SlurmEnvironment.SLURM_JOB_STATE == "OUT_OF_MEMORY" {
+		j.Hints = append(j.Hints, "TIP: The job ran out of memory. Please re-submit with increased memory requirements")
+		return
+	}
 
-		if j.SlurmEnvironment.SLURM_JOB_STATE == "TIMEOUT" {
-			j.Hints = append(j.Hints, "TIP: The job ran into a timeout. Please re-submit with increased walltime requirements and potentially to a different QOS)")
-			return
-		}
+	if j.SlurmEnvironment.SLURM_JOB_STATE == "TIMEOUT" {
+		j.Hints = append(j.Hints, "TIP: The job ran into a timeout. Please re-submit with increased walltime requirements and potentially to a different QOS)")
+		return
+	}
 
-		// Check memory consumption
-		if j.JobStats.ReqMem/2 > j.JobStats.MaxRSS {
+	// Check memory consumption
+	if j.JobStats.ReqMem/2 > j.JobStats.MaxRSS {
+		if j.JobStats.ReqMem > hints["min_bytes"] {
 			j.Hints = append(j.Hints, "TIP: Please consider lowering the amount of requested memory in the future, your job has consumed less than half of the requested memory.")
 		}
-		// check CPU time (16 cores requested only 1 used)
-		if j.JobStats.CPUTime/2 > j.JobStats.TotalCPU {
-			j.Hints = append(j.Hints, "TIP: Please consider lowering the amount of requested CPU cores in the future, your job has consumed less than half of the requested CPU cores")
-		}
+	}
+	// check CPU usage if over "min_cpu" is requested (so people don't get docked for a job requesting a minimal amount of CPU)
+	if j.JobStats.Ncpus > int64(hints["min_cpu"]) && j.JobStats.CPUTime/2 > j.JobStats.TotalCPU {
+		j.Hints = append(j.Hints, "TIP: Please consider lowering the amount of requested CPU cores in the future, your job has consumed less than half of the requested CPU cores")
+	}
 
-		// Check if runtime is half of the requested runtime
-		if j.JobStats.Walltime/2 > j.JobStats.Runtime {
+	// Check if runtime is half of the requested runtime
+	if j.JobStats.Walltime/2 > j.JobStats.Runtime {
 
-			// Check if it was submitted without specifying a walltime (just against default maxwalltime of QOS)
-			optimalQos := calculateOptimalQOS(qosMap, j.JobStats.Runtime)
+		// Check if it was submitted without specifying a walltime (just against default maxwalltime of QOS)
+		optimalQos := calculateOptimalQOS(qosMap, j.JobStats.Runtime)
 
-			// reverse the map to LimitQos format map[uint64]string to be used onwards without too many modifications to code...
-			lqMap := makeQoSReversed(qosMap)
-			//if qos, ok := qosMap[j.JobStats.Walltime]; ok { // original
-			if qos, ok := lqMap[j.JobStats.Walltime]; ok { // new
-				if qos != optimalQos {
+		// reverse the map to LimitQos format map[uint64]string to be used onwards without too many modifications to code...
+		lqMap := makeQoSReversed(qosMap)
+		//if qos, ok := qosMap[j.JobStats.Walltime]; ok { // original
+		if qos, ok := lqMap[j.JobStats.Walltime]; ok { // new
+			if qos != optimalQos {
+				if hints["change_qos"] > 0 {
 					j.Hints = append(j.Hints, fmt.Sprintf("TIP: Your job was submitted to %s QOS and finished within half of the requested walltime. Consider submitting it to the %s QOS instead", qos, optimalQos))
-				} else {
+				}
+			} else {
+				if hints["no_time"] > 0 {
 					j.Hints = append(j.Hints, fmt.Sprintf("TIP: Your job was submitted to %s QOS and finished within half of the requested walltime. Consider reducing the walltime for backfilling purposes", qos))
 				}
+			}
+			if hints["no_time"] > 0 {
 				j.Hints = append(j.Hints, fmt.Sprintf("TIP: No --time specified: Using default %s QOS limit. Specify --time to increase the chances that the scheduler will use this job for backfilling purposes", qos))
-			} else {
-
+			}
+		} else {
+			if hints["change_qos"] > 0 && hints["no_time"] > 0 {
 				j.Hints = append(j.Hints, fmt.Sprintf("TIP: Your job was submitted with a walltime of %s and finished in less half of the time, consider reducing the walltime and submit it to %s QOS", j.JobStats.WalltimeStr, optimalQos))
 			}
-
 		}
+
 	}
 }
 
 // Get SLURM_* environment variables from the environment
+//
 //	todo: consider moving this to map and populate with keys matching "SLURM_"
 func (j *JobContext) GetSlurmEnvVars() {
 

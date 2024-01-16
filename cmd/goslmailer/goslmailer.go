@@ -73,7 +73,7 @@ func main() {
 
 	// generate hints based on SlurmEnv and JobStats (e.g. "too much memory requested" or "walltime << requested queue")
 	// only if job is END or fail(?)
-	job.GenerateHints(cfg.QosMap)
+	job.GenerateHints(cfg.QosMap, cfg.Hints)
 
 	// populate map with configured referenced connectors
 	connectors.ConMap.PopulateConnectors(cfg, l)
